@@ -21,7 +21,7 @@ services:
     environment:
       PORT: "8080"
       DATABASE_URL: postgres://postgres:postgres@db:5432/cinema?sslmode=disable
-      JWT_SECRET: ${JWT_SECRET:-local-dev-only-secret-change-me-0123456789}
+      JWT_SECRET: ${JWT_SECRET:-mkp-backend-test-2025-default-jwt-secret}
       JWT_TTL: 24h
     ports:
       - "127.0.0.1:8080:8080"
