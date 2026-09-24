@@ -1,0 +1,30 @@
+flowchart TD
+    A(["🙋 Customer membuka aplikasi"]) --> B["📍 Pilih kota & bioskop"]
+    B --> C["🎬 Pilih film & jam tayang"]
+    C --> D["💺 Lihat denah kursi<br/><small>hijau = kosong · kuning = sedang dipilih orang · abu = terjual</small>"]
+    D --> E["👆 Pilih kursi lalu klik <b>Lanjut</b>"]
+    E --> F{"🔒 Apakah kursi<br/>masih kosong?"}
+    F -- "Tidak, baru saja<br/>diambil orang lain" --> G["⚠️ Tampilkan pesan<br/>'Kursi sudah dipilih orang lain'"]
+    G --> D
+    F -- "Ya" --> H["⏳ Kursi DIKUNCI untuk customer<br/>selama 10 menit<br/><small>orang lain tidak bisa memilih kursi ini</small>"]
+    H --> I["💳 Pilih metode bayar<br/>(VA / QRIS / e-Wallet / Kartu)"]
+    I --> J{"Bayar sebelum<br/>10 menit habis?"}
+    J -- "Tidak / Gagal" --> K["⌛ Pesanan kedaluwarsa"]
+    K --> L["♻️ Kursi otomatis kembali<br/>tersedia (restok)"]
+    L --> Z1(["Selesai – customer bisa pesan ulang"])
+    J -- "Ya" --> M["✅ Payment Gateway<br/>konfirmasi pembayaran"]
+    M --> N["🎟️ Kursi berstatus TERJUAL<br/>+ e-ticket (QR code) dibuat"]
+    N --> O["🔔 E-ticket dikirim via<br/>Email / WhatsApp / Aplikasi"]
+    O --> P["🚪 Datang ke bioskop,<br/>scan QR di pintu studio"]
+    P --> Q(["🍿 Selamat menonton!"])
+
+    classDef start fill:#4F46E5,stroke:#312E81,color:#fff,stroke-width:2px
+    classDef step fill:#EEF2FF,stroke:#6366F1,color:#1E1B4B,stroke-width:2px
+    classDef decision fill:#FEF9C3,stroke:#CA8A04,color:#422006,stroke-width:2px
+    classDef bad fill:#FEE2E2,stroke:#DC2626,color:#450A0A,stroke-width:2px
+    classDef good fill:#DCFCE7,stroke:#16A34A,color:#052E16,stroke-width:2px
+    class A,Q,Z1 start
+    class B,C,D,E,I,O,P step
+    class F,J decision
+    class G,K bad
+    class H,L,M,N good

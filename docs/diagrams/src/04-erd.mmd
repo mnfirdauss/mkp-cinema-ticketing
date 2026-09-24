@@ -1,0 +1,142 @@
+erDiagram
+    cities ||--o{ cinemas : "memiliki"
+    cinemas ||--o{ studios : "memiliki"
+    cinemas |o--o{ users : "admin bioskop"
+    studios ||--o{ seats : "layout kursi"
+    movies ||--o{ showtimes : "ditayangkan"
+    studios ||--o{ showtimes : "dijadwalkan di"
+    users |o--o{ showtimes : "created_by"
+    showtimes ||--o{ showtime_seats : "inventory kursi"
+    seats ||--o{ showtime_seats : "instance per jadwal"
+    users ||--o{ bookings : "memesan"
+    showtimes ||--o{ bookings : "untuk jadwal"
+    bookings ||--|{ booking_items : "berisi"
+    showtime_seats ||--o{ booking_items : "kursi dipesan"
+    bookings |o--o{ showtime_seats : "hold / sold oleh"
+    booking_items ||--o| tickets : "e-ticket"
+    bookings ||--o{ payments : "dibayar via"
+    bookings ||--o| refunds : "di-refund"
+    payments ||--o{ refunds : "sumber dana"
+    users |o--o{ refunds : "processed_by"
+    showtime_seats ||--o{ seat_status_logs : "histori status"
+
+    cities {
+        bigserial id PK
+        varchar name
+        varchar province
+        varchar timezone "WIB/WITA/WIT"
+    }
+    cinemas {
+        bigserial id PK
+        bigint city_id FK
+        varchar code UK
+        varchar name
+        text address
+        boolean is_active
+    }
+    studios {
+        bigserial id PK
+        bigint cinema_id FK
+        varchar name
+        studio_type type "regular/premiere/imax/4dx"
+        int total_seats
+    }
+    seats {
+        bigserial id PK
+        bigint studio_id FK
+        varchar row_label "A,B,C"
+        int seat_number
+        seat_type type "regular/vip/sweetbox"
+        boolean is_active
+    }
+    users {
+        uuid id PK
+        varchar full_name
+        varchar email UK
+        varchar password_hash "bcrypt"
+        user_role role "customer/cinema_admin/super_admin"
+        bigint cinema_id FK
+        timestamptz last_login_at
+    }
+    movies {
+        bigserial id PK
+        varchar title
+        int duration_minutes
+        varchar rating "SU/13+/17+/21+"
+        varchar genre
+        date release_date
+    }
+    showtimes {
+        bigserial id PK
+        bigint movie_id FK
+        bigint studio_id FK
+        timestamptz start_time
+        timestamptz end_time "EXCLUDE overlap"
+        numeric price
+        showtime_status status "scheduled/open/closed/cancelled/finished"
+        text cancel_reason
+        uuid created_by FK
+        timestamptz deleted_at "soft delete"
+    }
+    showtime_seats {
+        bigserial id PK
+        bigint showtime_id FK "UK(showtime_id, seat_id)"
+        bigint seat_id FK
+        seat_status status "available/held/sold/blocked"
+        uuid booking_id FK
+        timestamptz held_until
+        int version "optimistic lock"
+    }
+    bookings {
+        uuid id PK
+        varchar booking_code UK
+        uuid user_id FK
+        bigint showtime_id FK
+        int seat_count
+        numeric total_amount
+        booking_status status "pending/paid/expired/cancelled/refunded"
+        timestamptz expires_at
+        varchar idempotency_key UK
+        timestamptz paid_at
+    }
+    booking_items {
+        bigserial id PK
+        uuid booking_id FK
+        bigint showtime_seat_id FK
+        numeric price
+    }
+    tickets {
+        uuid id PK
+        bigint booking_item_id FK "UK"
+        varchar ticket_code UK "QR"
+        ticket_status status "active/used/void"
+        timestamptz used_at
+    }
+    payments {
+        uuid id PK
+        uuid booking_id FK
+        varchar provider
+        varchar method
+        varchar provider_ref UK
+        numeric amount
+        payment_status status
+        jsonb raw_callback
+    }
+    refunds {
+        uuid id PK
+        uuid booking_id FK "UK"
+        uuid payment_id FK
+        refund_initiator initiated_by "cinema/customer/system"
+        text reason
+        numeric amount
+        refund_status status
+        uuid processed_by FK
+    }
+    seat_status_logs {
+        bigserial id PK
+        bigint showtime_seat_id FK
+        seat_status from_status
+        seat_status to_status
+        uuid booking_id
+        varchar reason "hold/paid/hold_expired/refund/restock"
+    }

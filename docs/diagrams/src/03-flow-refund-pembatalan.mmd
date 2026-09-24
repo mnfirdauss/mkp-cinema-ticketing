@@ -1,0 +1,36 @@
+flowchart TD
+    A(["🏢 Admin bioskop membatalkan jadwal<br/><small>mis. proyektor rusak / listrik padam / film ditarik</small>"]) --> B["📝 Isi alasan pembatalan"]
+    B --> C["⛔ Status jadwal = CANCELLED<br/>penjualan tiket langsung dihentikan"]
+    C --> D["🔓 Kursi yang sedang di-hold dilepas<br/>pesanan pending dibatalkan (tanpa tagihan)"]
+    C --> E["📋 Sistem mencari semua pesanan<br/>yang SUDAH DIBAYAR"]
+    E --> F["↩️ Buat data REFUND per pesanan<br/>100% dana · inisiator = bioskop"]
+    F --> G[["📬 Masuk antrian Refund Worker"]]
+    G --> H["🏦 Kirim permintaan refund<br/>ke Payment Gateway"]
+    H --> I{"Refund<br/>berhasil?"}
+    I -- "Gagal" --> J["🔁 Coba lagi otomatis<br/>(maks. 5x, jeda bertahap)"]
+    J --> K{"Masih gagal?"}
+    K -- "Ya" --> L["👩‍💼 Diteruskan ke tim Finance<br/>untuk refund manual"]
+    K -- "Tidak" --> M
+    I -- "Berhasil" --> M["✅ Pesanan = REFUNDED<br/>e-ticket = VOID (QR tidak berlaku)"]
+    L --> M
+    M --> N["🔔 Notifikasi ke customer<br/>+ tawaran jadwal pengganti / voucher"]
+    M --> O["📊 Semua perubahan tercatat<br/>di log audit & laporan keuangan"]
+    O -. "bandingkan: refund 1 pesanan<br/>saat jadwal TETAP tayang" .-> R1
+
+    subgraph R["♻️ RESTOK – refund 1 pesanan saat jadwal TETAP tayang"]
+        direction TB
+        R1["Pesanan di-refund<br/>(kebijakan bioskop / kesalahan sistem)"] --> R2{"Jadwal belum mulai<br/>& masih dibuka?"}
+        R2 -- "Ya" --> R3["Kursi SOLD ➜ AVAILABLE<br/>bisa dijual lagi ke customer lain"]
+        R2 -- "Tidak" --> R4["Kursi tetap tercatat,<br/>tidak dijual ulang"]
+    end
+
+    classDef start fill:#DC2626,stroke:#7F1D1D,color:#fff,stroke-width:2px
+    classDef step fill:#FFF1F2,stroke:#E11D48,color:#4C0519,stroke-width:2px
+    classDef decision fill:#FEF9C3,stroke:#CA8A04,color:#422006,stroke-width:2px
+    classDef good fill:#DCFCE7,stroke:#16A34A,color:#052E16,stroke-width:2px
+    classDef queue fill:#FEF3C7,stroke:#D97706,color:#78350F,stroke-width:2px
+    class A start
+    class B,C,D,E,F,H,J,L,R1,R4 step
+    class I,K,R2 decision
+    class M,N,O,R3 good
+    class G queue
