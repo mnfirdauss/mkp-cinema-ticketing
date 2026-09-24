@@ -3,8 +3,10 @@ package handler
 import (
 	"errors"
 	"log/slog"
+	"net"
 	"net/http"
 	"net/mail"
+	"strconv"
 	"strings"
 	"time"
 
@@ -16,12 +18,13 @@ import (
 )
 
 type AuthHandler struct {
-	users  *repository.UserRepository
-	tokens *auth.TokenService
+	users   *repository.UserRepository
+	tokens  *auth.TokenService
+	limiter *auth.LoginLimiter
 }
 
-func NewAuthHandler(users *repository.UserRepository, tokens *auth.TokenService) *AuthHandler {
-	return &AuthHandler{users: users, tokens: tokens}
+func NewAuthHandler(users *repository.UserRepository, tokens *auth.TokenService, limiter *auth.LoginLimiter) *AuthHandler {
+	return &AuthHandler{users: users, tokens: tokens, limiter: limiter}
 }
 
 type loginRequest struct {
@@ -57,17 +60,30 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	limitKey := clientIP(r) + "|" + strings.ToLower(req.Email)
+	if ok, wait := h.limiter.Allowed(limitKey); !ok {
+		w.Header().Set("Retry-After", strconv.Itoa(int(wait.Seconds())+1))
+		httpx.Error(w, http.StatusTooManyRequests, "too many failed login attempts, please try again later")
+		return
+	}
+
 	user, err := h.users.FindByEmail(r.Context(), req.Email)
 	if err != nil && !errors.Is(err, repository.ErrNotFound) {
 		slog.Error("find user", "error", err)
 		httpx.Error(w, http.StatusInternalServerError, "internal server error")
 		return
 	}
-	// Same message for unknown email and wrong password to avoid user enumeration.
+	// Same message and (via the dummy bcrypt compare) same response time for
+	// unknown email and wrong password, to avoid user enumeration.
+	if user == nil {
+		auth.CheckPasswordDummy(req.Password)
+	}
 	if user == nil || !auth.CheckPassword(user.PasswordHash, req.Password) {
+		h.limiter.Fail(limitKey)
 		httpx.Error(w, http.StatusUnauthorized, "invalid email or password")
 		return
 	}
+	h.limiter.Reset(limitKey)
 	if !user.IsActive {
 		httpx.Error(w, http.StatusForbidden, "account is disabled")
 		return
@@ -89,6 +105,17 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		ExpiresAt:   exp,
 		User:        user,
 	})
+}
+
+// clientIP uses the TCP peer address. X-Forwarded-For is deliberately not
+// trusted because clients can spoof it; behind a trusted proxy, configure the
+// proxy to set RemoteAddr (or add explicit trusted-proxy handling).
+func clientIP(r *http.Request) string {
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		return r.RemoteAddr
+	}
+	return host
 }
 
 // Me godoc: GET /api/v1/auth/me

@@ -1,6 +1,6 @@
 module github.com/mnfirdauss/mkp-cinema-ticketing
 
-go 1.26.4
+go 1.26.6
 
 require (
 	github.com/golang-jwt/jwt/v5 v5.3.1

@@ -20,8 +20,15 @@ func ClaimsFrom(ctx context.Context) *auth.Claims {
 	return c
 }
 
-// Authenticate validates the "Authorization: Bearer <token>" header.
-func Authenticate(tokens *auth.TokenService) func(http.Handler) http.Handler {
+// UserLookup returns the current role, cinema and active flag of a user, so
+// that deactivating a user or changing their role takes effect immediately
+// instead of waiting for the JWT to expire. It returns an error if the user
+// does not exist.
+type UserLookup func(ctx context.Context, userID string) (role string, cinemaID *int64, active bool, err error)
+
+// Authenticate validates the "Authorization: Bearer <token>" header. When
+// lookup is non-nil the user is re-checked against the database.
+func Authenticate(tokens *auth.TokenService, lookup UserLookup) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			header := r.Header.Get("Authorization")
@@ -34,6 +41,14 @@ func Authenticate(tokens *auth.TokenService) func(http.Handler) http.Handler {
 			if err != nil {
 				httpx.Error(w, http.StatusUnauthorized, "invalid or expired token")
 				return
+			}
+			if lookup != nil {
+				role, cinemaID, active, err := lookup(r.Context(), claims.UserID())
+				if err != nil || !active {
+					httpx.Error(w, http.StatusUnauthorized, "invalid or expired token")
+					return
+				}
+				claims.Role, claims.CinemaID = role, cinemaID
 			}
 			next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), ctxKey{}, claims)))
 		})

@@ -34,7 +34,7 @@ docker compose up -d --build
 
 ### Opsi 2: Manual
 
-Kebutuhan: Go 1.26+ dan PostgreSQL 14+.
+Kebutuhan: Go 1.26.6+ dan PostgreSQL 14+.
 
 ```bash
 createdb cinema
@@ -42,7 +42,7 @@ psql -d cinema -f db/schema.sql
 psql -d cinema -f db/seed.sql
 
 cp .env.example .env   # sesuaikan jika perlu
-export $(cat .env | xargs)
+set -a; source .env; set +a   # isi JWT_SECRET dulu (min. 32 karakter)
 go run ./cmd/api
 ```
 
@@ -101,7 +101,17 @@ Format response:
 - Saat jadwal dibuat, **inventory kursi** (`showtime_seats`) ikut dibuat otomatis dalam transaksi yang sama.
 - Jika jadwal sudah memiliki kursi `held`/`sold`, film/studio/jam tayang tidak dapat diubah dan jadwal tidak dapat dihapus (409). Admin harus memakai alur pembatalan & refund, lihat [System Design §2.4](docs/SYSTEM_DESIGN.md#24-refund--pembatalan-dari-pihak-bioskop).
 - Status `cancelled` tidak bisa di-set lewat CRUD karena pembatalan harus melalui alur refund.
-- Login mengembalikan pesan error yang sama untuk email tidak terdaftar dan password salah, sehingga tidak bisa dipakai untuk mengecek email mana yang terdaftar (user enumeration).
+
+### Keamanan
+
+- **Anti user enumeration**: email tidak terdaftar dan password salah menghasilkan pesan *dan waktu respons* yang sama (bcrypt tetap dijalankan terhadap dummy hash).
+- **Anti brute force**: setelah 5 kali login gagal per IP + email, login diblokir 15 menit (`429` + header `Retry-After`).
+- **Token selalu dicek ulang ke database**: user yang dinonaktifkan atau diubah role-nya langsung kehilangan akses, tanpa menunggu JWT kedaluwarsa.
+- JWT HS256 dengan validasi algoritma (token `alg: none` ditolak) dan issuer. `JWT_SECRET` wajib diisi, minimal 32 karakter; server menolak start jika tidak ada.
+- Semua query memakai parameter (aman dari SQL injection). Input divalidasi, body dibatasi 1 MB, field JSON yang tidak dikenal ditolak.
+- Password disimpan dengan bcrypt. Container API berjalan sebagai non-root. Port Postgres & API pada docker-compose hanya bind ke `127.0.0.1`.
+- `govulncheck` bersih (Go 1.26.6).
+- Catatan: rate limiter login bersifat in-memory. Jika API dijalankan lebih dari satu replika, limiter perlu dipindah ke Redis. Akun & secret di seed/compose hanya untuk demo lokal.
 
 ## Struktur Project
 
@@ -122,4 +132,4 @@ docs/                 dokumen system design & database design, diagram JPG
 postman/              Postman collection
 ```
 
-**Tech stack**: Go 1.26 (`net/http` dengan routing bawaan), pgx v5, golang-jwt v5, bcrypt, PostgreSQL 16, Docker.
+**Tech stack**: Go 1.26.6 (`net/http` dengan routing bawaan), pgx v5, golang-jwt v5, bcrypt, PostgreSQL 16, Docker.

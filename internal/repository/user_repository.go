@@ -46,3 +46,18 @@ func (r *UserRepository) findOne(ctx context.Context, query string, arg any) (*m
 	}
 	return &u, nil
 }
+
+// AuthState returns the fields the auth middleware re-checks on every request.
+func (r *UserRepository) AuthState(ctx context.Context, id string) (string, *int64, bool, error) {
+	var (
+		role     string
+		cinemaID *int64
+		active   bool
+	)
+	err := r.db.QueryRow(ctx, `SELECT role::text, cinema_id, is_active FROM users WHERE id = $1`, id).
+		Scan(&role, &cinemaID, &active)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", nil, false, ErrNotFound
+	}
+	return role, cinemaID, active, err
+}

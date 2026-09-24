@@ -21,7 +21,11 @@ import (
 
 func main() {
 	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, nil)))
-	cfg := config.Load()
+	cfg, err := config.Load()
+	if err != nil {
+		slog.Error("load config", "error", err)
+		os.Exit(1)
+	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
@@ -34,10 +38,11 @@ func main() {
 	defer db.Close()
 
 	tokens := auth.NewTokenService(cfg.JWTSecret, cfg.JWTTTL)
-	authH := handler.NewAuthHandler(repository.NewUserRepository(db), tokens)
+	users := repository.NewUserRepository(db)
+	authH := handler.NewAuthHandler(users, tokens, auth.NewLoginLimiter(5, 15*time.Minute))
 	showtimeH := handler.NewShowtimeHandler(repository.NewShowtimeRepository(db))
 
-	authenticated := mw.Authenticate(tokens)
+	authenticated := mw.Authenticate(tokens, users.AuthState)
 	adminOnly := mw.RequireRole(auth.RoleSuperAdmin, auth.RoleCinemaAdmin)
 	protect := func(h http.HandlerFunc, extra ...func(http.Handler) http.Handler) http.Handler {
 		return mw.Chain(h, append([]func(http.Handler) http.Handler{authenticated}, extra...)...)

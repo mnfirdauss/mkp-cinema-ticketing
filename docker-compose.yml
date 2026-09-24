@@ -6,7 +6,7 @@ services:
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: cinema
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
       - ./db/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
       - ./db/seed.sql:/docker-entrypoint-initdb.d/02-seed.sql:ro
@@ -21,10 +21,10 @@ services:
     environment:
       PORT: "8080"
       DATABASE_URL: postgres://postgres:postgres@db:5432/cinema?sslmode=disable
-      JWT_SECRET: super-secret-mkp-key
+      JWT_SECRET: ${JWT_SECRET:-local-dev-only-secret-change-me-0123456789}
       JWT_TTL: 24h
     ports:
-      - "8080:8080"
+      - "127.0.0.1:8080:8080"
     depends_on:
       db:
         condition: service_healthy

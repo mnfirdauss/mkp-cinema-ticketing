@@ -15,7 +15,7 @@ func TestAuthenticateAndRequireRole(t *testing.T) {
 	customerToken, _, _ := tokens.Generate("c", auth.RoleCustomer, nil)
 
 	ok := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusNoContent) })
-	h := Chain(ok, Authenticate(tokens), RequireRole(auth.RoleSuperAdmin, auth.RoleCinemaAdmin))
+	h := Chain(ok, Authenticate(tokens, nil), RequireRole(auth.RoleSuperAdmin, auth.RoleCinemaAdmin))
 
 	tests := []struct {
 		name   string

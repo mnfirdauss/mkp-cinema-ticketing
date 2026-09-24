@@ -19,6 +19,11 @@ import (
 // excluded: cancelling a showtime must go through the refund flow.
 var editableStatuses = []string{"scheduled", "open", "closed", "finished"}
 
+const (
+	maxPrice = 10_000_000 // well within NUMERIC(12,2)
+	maxPage  = 100_000
+)
+
 type ShowtimeHandler struct {
 	repo *repository.ShowtimeRepository
 }
@@ -67,6 +72,9 @@ func (h *ShowtimeHandler) List(w http.ResponseWriter, r *http.Request) {
 	}
 	if f.Page < 1 {
 		f.Page = 1
+	}
+	if f.Page > maxPage {
+		f.Page = maxPage
 	}
 	if f.Limit < 1 || f.Limit > 100 {
 		f.Limit = 20
@@ -234,8 +242,8 @@ func decodeShowtime(w http.ResponseWriter, r *http.Request, requireFuture bool) 
 	case requireFuture && start.Before(time.Now()):
 		errs["start_time"] = "must be in the future"
 	}
-	if req.Price < 0 {
-		errs["price"] = "must be >= 0"
+	if req.Price < 0 || req.Price > maxPrice {
+		errs["price"] = "must be between 0 and 10000000"
 	}
 	if req.Status == "" {
 		req.Status = "scheduled"
